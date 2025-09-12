@@ -1,0 +1,17 @@
+{
+  "name": "grow-backend",
+  "version": "1.0.0",
+  "description": "grow with backend",
+  "keywords": [
+    "javascript",
+    "backend",
+    "grow"
+  ],
+  "license": "ISC",
+  "author": "Baidurjya Sikder",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
