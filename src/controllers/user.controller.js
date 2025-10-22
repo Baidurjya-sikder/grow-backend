@@ -5,6 +5,7 @@ import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
 import mongoose from "mongoose";
+import bcrypt from "bcrypt"
 
 const generateAccessAndRefreshTokens = async(userId) => 
 {
@@ -41,8 +42,7 @@ const registerUser = asyncHandler( async (req, res) => {
    //console.log("email: ", email);
 
    if (
-       [fullName, email, username, password].some((field) =>
-       field?.trim() === "")
+       [fullName, email, username, password].some((field) => field?.trim() === "")
    ) {
         throw new ApiError(400, "All fields are required")
    }
@@ -62,10 +62,8 @@ const registerUser = asyncHandler( async (req, res) => {
 
 
    let coverImageLocalPath;
-   if (req.files && Array.isArray(req.files.
-   coverImage) && req.files.coverImage.length > 0) {
-       coverImageLocalPath = req.files.coverImage[0].
-       path
+   if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+       coverImageLocalPath = req.files.coverImage[0].path
    }
 
 
@@ -116,9 +114,16 @@ const loginUser = asyncHandler(async (req, res) =>{
 
      const {email, username, password} = req.body
 
-     if (!(username || email)) {
+     if (!username && !email) {
           throw new ApiError(400, "username or email is required")
      }
+
+     // Here is an alternative of above code based on logic discussed in video:
+    // if (!(username || email)) {
+    //     throw new ApiError(400, "username or email is required")
+        
+    // }
+
 
      const user = await User.findOne({
           $or: [{username}, {email}]
@@ -167,8 +172,8 @@ const logoutUser = asyncHandler(async(req, res) => {
      await User.findByIdAndUpdate(
           req.user._id,
           {
-               $set: {
-                    refreshToken: undefined
+               $unset: {
+                    refreshToken: 1 // this removes the field from document
                }
           },
           {
@@ -237,7 +242,7 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
 })
 
 
-const changeCurrentPassword = asyncHandler(async(req, res) => {
+/*const changeCurrentPassword = asyncHandler(async(req, res) => {
      const {oldPassword, newPassword} = req.body
 
      const user = await User.findById(req.user?._id)
@@ -250,10 +255,43 @@ const changeCurrentPassword = asyncHandler(async(req, res) => {
      user.password = newPassword
      await user.save({validateBeforeSave: false})
 
-     return res
-     .status(200)
-     .json(new ApiResponse(200, {}, "Password changed successfully"))
+     return res.status(200).json(new ApiResponse(200, {}, "Password changed successfully"))
 })
+*/
+
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+     //console.log("Request body:",req.body);
+
+
+  const { oldPassword, newPassword } = req.body;
+     
+
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(400, "Old and new passwords are required");
+
+  }
+
+  const user = await User.findById(req.user?._id).select("+password");
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  //const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+
+  //if (!isPasswordCorrect) {
+  //  throw new ApiError(400, "Invalid old password");
+  //}
+  user.password = newPassword;
+  const ismatch = await bcrypt.compare(oldPassword, newPassword)
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully"));
+});
+
+
 
 const getCurrentUser = asyncHandler(async(req, res) => {
      return res
@@ -274,7 +312,7 @@ const updateAccountDetails = asyncHandler(async(req, res) => {
           {
               $set: {
                    fullName,
-                   email
+                   email: email
               } 
           },
           {new: true}
@@ -379,7 +417,7 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
                     from: "subscriptions",
                     localField: "_id",
                     foreignField: "subscriber",
-                    as: "subscriberedTo"
+                    as: "subscribedTo"
                }
           },
           {
@@ -429,7 +467,7 @@ const getWatchHistory = asyncHandler(async(req, res) => {
      const user = await User.aggregate([
           {
               $match: {
-                  _id: new mongoose.Types.ObjectId.createFromHexString(req.user._id)
+                  _id: new mongoose.Types.ObjectId(req.user._id)
               }
           },
           {
